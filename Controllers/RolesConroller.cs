@@ -1,8 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using UserManagement.API.Data;
-using UserManagement.API.DTOs.RoleDTOs;
+using UserManagement.API.DTOs.CommonDTOs;
+using UserManagement.API.Services.Interfaces;
 
 namespace UserManagement.API.Controllers
 {
@@ -11,26 +10,46 @@ namespace UserManagement.API.Controllers
     [Authorize(Roles = "Admin")]
     public class RolesController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IRoleService _roleService;
 
-        public RolesController(AppDbContext context)
+        public RolesController(IRoleService roleService)
         {
-            _context = context;
+            _roleService = roleService;
         }
 
+        // GET: /api/roles/list-all
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        [HttpGet("list-all")]
+        public async Task<IActionResult> ListAll()
         {
-            var roles = await _context.Roles
-                .OrderBy(x => x.Id)
-                .Select(x => new RoleResponseDto
-                {
-                    Id = x.Id,
-                    RoleName = x.RoleName
-                })
-                .ToListAsync();
+            var result = await _roleService.ListAllAsync();
+            return Ok(result);
+        }
 
-            return Ok(roles);
+        // GET: /api/roles/get/1
+        // [HttpGet("get/{id:int}")]
+        // public async Task<IActionResult> GetById(int id)
+        // {
+        //     var result = await _roleService.GetByIdAsync(id);
+        //     return ToActionResult(result);
+        // }
+
+        private IActionResult ToActionResult<T>(ServiceResultDto<T> result)
+        {
+            var response = new
+            {
+                message = result.Message,
+                data = result.Data
+            };
+
+            return result.StatusCode switch
+            {
+                200 => Ok(response),
+                400 => BadRequest(new { message = result.Message }),
+                401 => Unauthorized(new { message = result.Message }),
+                404 => NotFound(new { message = result.Message }),
+                _ => StatusCode(result.StatusCode, response)
+            };
         }
     }
 }
