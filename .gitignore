@@ -1,14 +1,32 @@
+# Build results
 bin/
 obj/
-.vs/
-.vscode/
 
+# Visual Studio
+.vs/
 *.user
 *.suo
-*.rsuser
+*.userosscache
+*.sln.docstates
 
-appsettings.Development.json
+# Rider / JetBrains
+.idea/
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
 .env
+.env.*
+appsettings.Production.json
 
-TestResults/
+# Logs
 *.log
+
+# NuGet
+*.nupkg
+packages/
