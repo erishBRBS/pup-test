@@ -19,5 +19,9 @@ namespace UserManagement.API.Repositories.Interfaces
         Task AddAsync(User user);
 
         Task SaveChangesAsync();
+
+        Task<User?> GetByUsernameWithRoleAsync(string username);
+
+        Task<User?> GetByRefreshTokenWithRoleAsync(string refreshToken);
     }
 }

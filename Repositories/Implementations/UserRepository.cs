@@ -55,6 +55,20 @@ namespace UserManagement.API.Repositories.Implementations
                 .AnyAsync(x => x.Id == roleId);
         }
 
+        public async Task<User?> GetByUsernameWithRoleAsync(string username)
+        {
+            return await _context.Users
+                .Include(x => x.Role)
+                .FirstOrDefaultAsync(x => x.Username == username);
+        }
+
+        public async Task<User?> GetByRefreshTokenWithRoleAsync(string refreshToken)
+        {
+            return await _context.Users
+                .Include(x => x.Role)
+                .FirstOrDefaultAsync(x => x.RefreshToken == refreshToken);
+        }
+
         public async Task<List<User>> GetActiveByIdsAsync(List<int> ids)
         {
             return await _context.Users
