@@ -1,4 +1,4 @@
-namespace UserManagement.API.DTOs.Common
+namespace UserManagement.API.DTOs.CommonDTOs
 {
     public class PagedResultDto<T>
     {

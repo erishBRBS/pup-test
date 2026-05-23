@@ -1,10 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using UserManagement.API.Data;
+using System.Security.Claims;
+using UserManagement.API.DTOs.CommonDTOs;
 using UserManagement.API.DTOs.UserDTOs;
-using UserManagement.API.Helpers;
-using UserManagement.API.Models;
+using UserManagement.API.Services.Interfaces;
 
 namespace UserManagement.API.Controllers
 {
@@ -13,11 +12,11 @@ namespace UserManagement.API.Controllers
     [Authorize]
     public class UsersController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IUserService _userService;
 
-        public UsersController(AppDbContext context)
+        public UsersController(IUserService userService)
         {
-            _context = context;
+            _userService = userService;
         }
 
         // MARK: GET ALL USERS - PAGINATED / SEARCHABLE / SORTABLE
@@ -25,69 +24,7 @@ namespace UserManagement.API.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAll([FromQuery] UserQueryDto filter)
         {
-            var query = _context.Users
-                .Include(x => x.Role)
-                .AsNoTracking()
-                .Where(x => !x.IsDeleted)
-                .AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(filter.Search))
-            {
-                var search = filter.Search.Trim();
-
-                query = query.Where(x =>
-                    x.Username.Contains(search) ||
-                    x.FirstName.Contains(search) ||
-                    x.LastName.Contains(search) ||
-                    x.Role.RoleName.Contains(search));
-            }
-
-            var sortBy = filter.SortBy.Trim().ToLower();
-            var sortOrder = filter.SortOrder.Trim().ToLower();
-
-            query = (sortBy, sortOrder) switch
-            {
-                ("username", "asc") => query.OrderBy(x => x.Username),
-                ("username", "desc") => query.OrderByDescending(x => x.Username),
-
-                ("firstname", "asc") => query.OrderBy(x => x.FirstName),
-                ("firstname", "desc") => query.OrderByDescending(x => x.FirstName),
-
-                ("lastname", "asc") => query.OrderBy(x => x.LastName),
-                ("lastname", "desc") => query.OrderByDescending(x => x.LastName),
-
-                ("rolename", "asc") => query.OrderBy(x => x.Role.RoleName),
-                ("rolename", "desc") => query.OrderByDescending(x => x.Role.RoleName),
-
-                ("role", "asc") => query.OrderBy(x => x.Role.RoleName),
-                ("role", "desc") => query.OrderByDescending(x => x.Role.RoleName),
-
-                ("status", "asc") => query.OrderBy(x => x.Status),
-                ("status", "desc") => query.OrderByDescending(x => x.Status),
-
-                ("createdat", "asc") => query.OrderBy(x => x.CreatedAt),
-                _ => query.OrderByDescending(x => x.CreatedAt)
-            };
-
-            var result = await PaginationHelper.ToPagedResultAsync(
-                query,
-                filter.PageNumber,
-                filter.PageSize,
-                x => new UserResponseDto
-                {
-                    Id = x.Id,
-                    Username = x.Username,
-                    FirstName = x.FirstName,
-                    LastName = x.LastName,
-                    Status = x.Status,
-                    CreatedAt = x.CreatedAt,
-                    Role = new UserRoleResponseDto
-                    {
-                        Id = x.Role.Id,
-                        RoleName = x.Role.RoleName
-                    }
-                });
-
+            var result = await _userService.GetAllAsync(filter);
             return Ok(result);
         }
 
@@ -96,29 +33,8 @@ namespace UserManagement.API.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> ListAll()
         {
-            var users = await _context.Users
-                .Include(x => x.Role)
-                .AsNoTracking()
-                .Where(x => !x.IsDeleted)
-                .OrderBy(x => x.FirstName)
-                .ThenBy(x => x.LastName)
-                .Select(x => new UserResponseDto
-                {
-                    Id = x.Id,
-                    Username = x.Username,
-                    FirstName = x.FirstName,
-                    LastName = x.LastName,
-                    Status = x.Status,
-                    CreatedAt = x.CreatedAt,
-                    Role = new UserRoleResponseDto
-                    {
-                        Id = x.Role.Id,
-                        RoleName = x.Role.RoleName
-                    }
-                })
-                .ToListAsync();
-
-            return Ok(users);
+            var result = await _userService.ListAllAsync();
+            return Ok(result);
         }
 
         // MARK: GET USER BY ID
@@ -126,79 +42,17 @@ namespace UserManagement.API.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetById(int id)
         {
-            var user = await _context.Users
-                .Include(x => x.Role)
-                .AsNoTracking()
-                .Where(x => x.Id == id && !x.IsDeleted)
-                .Select(x => new UserResponseDto
-                {
-                    Id = x.Id,
-                    Username = x.Username,
-                    FirstName = x.FirstName,
-                    LastName = x.LastName,
-                    Status = x.Status,
-                    CreatedAt = x.CreatedAt,
-                    Role = new UserRoleResponseDto
-                    {
-                        Id = x.Role.Id,
-                        RoleName = x.Role.RoleName
-                    }
-                })
-                .FirstOrDefaultAsync();
-
-            if (user == null)
-            {
-                return NotFound(new { message = "User not found." });
-            }
-
-            return Ok(user);
+            var result = await _userService.GetByIdAsync(id);
+            return ToActionResult(result);
         }
 
         // MARK: CREATE USER
         [HttpPost("create")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> Create(UserCreateDto request)
+        public async Task<IActionResult> Create([FromBody] UserCreateDto request)
         {
-            var usernameExists = await _context.Users
-                .AnyAsync(x => x.Username == request.Username && !x.IsDeleted);
-
-            if (usernameExists)
-            {
-                return BadRequest(new { message = "Username already exists." });
-            }
-
-            var userRoleExists = await _context.Roles.AnyAsync(x => x.Id == 2);
-
-            if (!userRoleExists)
-            {
-                return BadRequest(new { message = "Default User role not found." });
-            }
-
-            var user = new User
-            {
-                Username = request.Username,
-                Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                FirstName = request.FirstName,
-                LastName = request.LastName,
-                RoleId = 2,
-                Status = true,
-                IsDeleted = false,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                message = "User created successfully.",
-                id = user.Id,
-                username = user.Username,
-                firstName = user.FirstName,
-                lastName = user.LastName,
-                status = user.Status,
-                isDeleted = user.IsDeleted
-            });
+            var result = await _userService.CreateAsync(request);
+            return ToActionResult(result);
         }
 
         // MARK: UPDATE USER BY ADMIN
@@ -206,102 +60,15 @@ namespace UserManagement.API.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(int id, [FromBody] UserUpdateDto request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { message = "Request body is required." });
-            }
-
-            var user = await _context.Users
-                .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
-
-            if (user == null)
-            {
-                return NotFound(new { message = "User not found." });
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.Username))
-            {
-                var usernameExists = await _context.Users
-                    .AnyAsync(x =>
-                        x.Username == request.Username &&
-                        x.Id != id &&
-                        !x.IsDeleted);
-
-                if (usernameExists)
-                {
-                    return BadRequest(new { message = "Username already exists." });
-                }
-
-                user.Username = request.Username;
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.FirstName))
-            {
-                user.FirstName = request.FirstName;
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.LastName))
-            {
-                user.LastName = request.LastName;
-            }
-
-            if (request.RoleId.HasValue)
-            {
-                var roleExists = await _context.Roles
-                    .AnyAsync(x => x.Id == request.RoleId.Value);
-
-                if (!roleExists)
-                {
-                    return BadRequest(new { message = "Role not found." });
-                }
-
-                user.RoleId = request.RoleId.Value;
-            }
-
-            if (request.Status.HasValue)
-            {
-                user.Status = request.Status.Value;
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.Password))
-            {
-                user.Password = BCrypt.Net.BCrypt.HashPassword(request.Password);
-
-                // Optional: force re-login after password update
-                user.RefreshToken = null;
-                user.RefreshTokenExpiresAt = null;
-                user.LastActivityAt = null;
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                message = "User updated successfully.",
-                data = new
-                {
-                    id = user.Id,
-                    username = user.Username,
-                    firstName = user.FirstName,
-                    lastName = user.LastName,
-                    roleId = user.RoleId,
-                    status = user.Status,
-                    isDeleted = user.IsDeleted
-                }
-            });
+            var result = await _userService.UpdateAsync(id, request);
+            return ToActionResult(result);
         }
 
         // MARK: UPDATE USER BY LOGGED IN USER
         [HttpPut("profile/update")]
-        [Authorize]
         public async Task<IActionResult> UpdateProfile([FromBody] UserProfileUpdateDto request)
         {
-            if (request == null)
-            {
-                return BadRequest(new { message = "Request body is required." });
-            }
-
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             if (string.IsNullOrWhiteSpace(userIdClaim))
             {
@@ -310,80 +77,35 @@ namespace UserManagement.API.Controllers
 
             var userId = int.Parse(userIdClaim);
 
-            var user = await _context.Users
-                .FirstOrDefaultAsync(x => x.Id == userId && !x.IsDeleted);
-
-            if (user == null)
-            {
-                return NotFound(new { message = "User not found." });
-            }
-
-            if (!user.Status)
-            {
-                return Unauthorized(new { message = "Account is inactive." });
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.FirstName))
-            {
-                user.FirstName = request.FirstName;
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.LastName))
-            {
-                user.LastName = request.LastName;
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                message = "Profile updated successfully.",
-                data = new
-                {
-                    id = user.Id,
-                    username = user.Username,
-                    firstName = user.FirstName,
-                    lastName = user.LastName,
-                    roleId = user.RoleId,
-                    status = user.Status,
-                    isDeleted = user.IsDeleted
-                }
-            });
+            var result = await _userService.UpdateProfileAsync(userId, request);
+            return ToActionResult(result);
         }
 
         // MARK: BULK SOFT DELETE USERS
         [HttpPost("bulk-delete")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> BulkDelete(UserBulkDeleteDto request)
+        public async Task<IActionResult> BulkDelete([FromBody] UserBulkDeleteDto request)
         {
-            if (request.Ids == null || !request.Ids.Any())
+            var result = await _userService.BulkDeleteAsync(request);
+            return ToActionResult(result);
+        }
+
+        private IActionResult ToActionResult<T>(ServiceResultDto<T> result)
+        {
+            var response = new
             {
-                return BadRequest(new { message = "No user IDs provided." });
-            }
+                message = result.Message,
+                data = result.Data
+            };
 
-            var users = await _context.Users
-                .Where(x => request.Ids.Contains(x.Id) && !x.IsDeleted)
-                .ToListAsync();
-
-            if (!users.Any())
+            return result.StatusCode switch
             {
-                return NotFound(new { message = "No users found to delete." });
-            }
-
-            foreach (var user in users)
-            {
-                user.IsDeleted = true;
-                user.RefreshToken = null;
-                user.RefreshTokenExpiresAt = null;
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                message = "Users deleted successfully.",
-                deletedCount = users.Count
-            });
+                200 => Ok(response),
+                400 => BadRequest(new { message = result.Message }),
+                401 => Unauthorized(new { message = result.Message }),
+                404 => NotFound(new { message = result.Message }),
+                _ => StatusCode(result.StatusCode, response)
+            };
         }
     }
 }

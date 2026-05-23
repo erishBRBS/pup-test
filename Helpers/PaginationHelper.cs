@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
-using UserManagement.API.DTOs.Common;
+using UserManagement.API.DTOs.CommonDTOs;
 
 namespace UserManagement.API.Helpers
 {
