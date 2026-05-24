@@ -36,9 +36,9 @@ namespace UserManagement.Services.DTOs.AuthDTOs
 
         public DateTime AccessTokenExpiresAt { get; set; }
 
-        // public string RefreshToken { get; set; } = string.Empty;
+        public string RefreshToken { get; set; } = string.Empty;
 
-        // public DateTime RefreshTokenExpiresAt { get; set; }
+        public DateTime RefreshTokenExpiresAt { get; set; }
     }
 }
 

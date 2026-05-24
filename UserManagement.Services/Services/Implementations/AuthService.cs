@@ -214,8 +214,8 @@ namespace UserManagement.Services.Services.Implementations
                 {
                     AccessToken = accessToken,
                     AccessTokenExpiresAt = accessTokenExpiresAt,
-                    // RefreshToken = refreshToken,
-                    // RefreshTokenExpiresAt = refreshTokenExpiresAt
+                    RefreshToken = refreshToken,
+                    RefreshTokenExpiresAt = refreshTokenExpiresAt
                 }
             };
         }
