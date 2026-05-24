@@ -6,7 +6,7 @@ namespace UserManagement.Services.Helpers
 {
     public static class PaginationHelper
     {
-        private static readonly int[] AllowedPageSizes = { 10, 20, 50 };
+        private static readonly int[] AllowedPageSizes = { 10, 25, 50 };
 
         public static async Task<PagedResultDto<TDestination>> ToPagedResultAsync<TSource, TDestination>(
             IQueryable<TSource> query,
