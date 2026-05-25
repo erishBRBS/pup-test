@@ -18,6 +18,8 @@ namespace UserManagement.Services.Services.Interfaces
         Task<ServiceResultDto<UserMutationResponseDto>> UpdateProfileAsync(int userId, UserProfileUpdateDto request);
 
         Task<ServiceResultDto<UserBulkDeleteResponseDto>> BulkDeleteAsync(UserBulkDeleteDto request);
+
+        Task<ServiceResultDto<UserMutationResponseDto>> RegisterAsync(RegisterDto request);
     }
 }
 

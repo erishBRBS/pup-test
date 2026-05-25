@@ -55,6 +55,14 @@ namespace UserManagement.API.Controllers
             return ToActionResult(result);
         }
 
+        [HttpPost("register")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Register([FromBody] RegisterDto request)
+        {
+            var result = await _userService.RegisterAsync(request);
+            return ToActionResult(result);
+        }   
+
         // MARK: UPDATE USER BY ADMIN
         [HttpPut("update/{id:int}")]
         [Authorize(Roles = "Admin")]

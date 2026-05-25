@@ -129,6 +129,46 @@ namespace UserManagement.Services.Services.Implementations
 
             return ServiceResultDto<UserResponseDto>.Ok("User retrieved successfully.", response);
         }
+        public async Task<ServiceResultDto<UserMutationResponseDto>> RegisterAsync(RegisterDto request)
+        {
+            if (request == null)
+            {
+                return ServiceResultDto<UserMutationResponseDto>.BadRequest("Request body is required.");
+            }
+
+            var usernameExists = await _userRepository.UsernameExistsAsync(request.Username);
+
+            if (usernameExists)
+            {
+                return ServiceResultDto<UserMutationResponseDto>.BadRequest("Username already exists.");
+            }
+
+            var userRoleExists = await _userRepository.RoleExistsAsync(2);
+
+            if (!userRoleExists)
+            {
+                return ServiceResultDto<UserMutationResponseDto>.BadRequest("Default User role not found.");
+            }
+
+            var user = new User
+            {
+                Username = request.Username,
+                Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                RoleId = 2,
+                Status = true,
+                IsDeleted = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _userRepository.AddAsync(user);
+            await _userRepository.SaveChangesAsync();
+
+            return ServiceResultDto<UserMutationResponseDto>.Ok(
+                "Registration successful. Please login.",
+                ToMutationResponse(user));
+        }
 
         public async Task<ServiceResultDto<UserMutationResponseDto>> CreateAsync(UserCreateDto request)
         {
